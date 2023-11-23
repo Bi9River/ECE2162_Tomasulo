@@ -1,0 +1,6 @@
+# TODO: add a parameter to initial the # of RS for each unit
+0: Add,Addi,Sub 1
+1: Add.d,Sub.d 3      
+2: Mult.d,Div 20     
+3: Ld,Sd 1     
+4: Bne,Beq 1

@@ -1,0 +1,10 @@
+# Addr	Val
+MEM[0]	0
+MEM[4]	2
+MEM[8]	3
+MEM[12]	0
+MEM[16]	0
+MEM[20]	1
+MEM[24]	5
+MEM[28]	0
+MEM[32]	4	
