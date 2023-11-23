@@ -1,5 +1,5 @@
 
-class LoadStoreQueue(object):     # TODO: add cycleRemained = 4
+class LoadStoreQueue(object):     # TODO: add cyclesRemained = 4
     def __init__(self):
         self.opName = ''
         self.pc = None
@@ -12,7 +12,7 @@ class LoadStoreQueue(object):     # TODO: add cycleRemained = 4
         self.Vk = None
         self.Qj = None
         self.Qk = None
-        self.cycleRemained = None       # will be set to 4 in issue state   # TODO: does it need robId? no
+        self.cyclesRemained = None       # will be set to 4 in issue state   # TODO: does it need robId? no
 
     def readFromMemory(self, memory):     # in execute stage, calculate the address
             self.address = self.Vj + self.Vk

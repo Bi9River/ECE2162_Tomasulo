@@ -54,6 +54,7 @@ while (not finished) and (PC != -1):
     if not IB.isEmpty():
         ROB, IB, FU, RF = issue(ROB, IB, PC, FU, RF)    # delete output PC
     FU = execute(FU, MM)
+    FU, MM = memoryAccess(FU, MM)
     print_report()
     cycles += 1
 
