@@ -3,7 +3,7 @@ from collections import deque
 
 class Instruction(object):
     def __init__(self, adrs, op, dest, s1, s2=None):
-        self.adress = adrs
+        self.adress = adrs    # is the pc?
         self.opname = op
         self.destination = dest
         self.source1 = s1   # operand1 and operand2/offset and operand(for Ld and Sd

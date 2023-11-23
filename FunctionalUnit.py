@@ -36,7 +36,7 @@ class FunctionalUnits(object):
     def add(self, fu):
         self.fuList.append(fu)
 
-    def findAvailable(self, opname):    # TODO: return the first available RS
+    def findAvailableRS(self, opname):    # TODO: return the first available RS
         for funtionalunit in self.fuList:
             if opname in funtionalunit.supportedInstructions:
                 for rs in funtionalunit.reservationStation:

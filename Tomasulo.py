@@ -1,6 +1,6 @@
 from LoadStoreQueue import LoadStoreQueue
 
-def fetch(instructionBuffer, pc, program, loadStoreQueue):
+def fetch(instructionBuffer, pc, program):
     while instructionBuffer.isFull() is False and int(pc) < 4 * len(program) and pc != -1:
         for i in program:
             if i.adress == pc:
@@ -16,27 +16,46 @@ def fetch(instructionBuffer, pc, program, loadStoreQueue):
 
 
 def issue(reorderBuffer, instructionBuffer, pc, functionalUnit, architectureRegisterFile):
-    if (instructionBuffer.head().opname == 'Ld') or (instructionBuffer.head().opname == 'Sd'):
-        inst = instructionBuffer.pop()
-        lsq = functionalUnit.findAvailableLSQ()      # TODO: does it need cycles?
-        lsq.opName = inst.opname
-        lsq.Vj = int(inst.source1)
-        for register in architectureRegisterFile.intRegisterList:
-            if register.name == inst.source2:
-                if register.busy:
-                    h = reorderBuffer.findLastEntry(register)
-                    if h is not None and h.ready:
-                        lsq.Vk = h.value
+    if reorderBuffer.isFull() is False and pc != -1:
+        if (instructionBuffer.head().opname == 'Ld') or (instructionBuffer.head().opname == 'Sd'):
+            inst = instructionBuffer.pop()
+            lsq = functionalUnit.findAvailableLSQ()      # TODO: does it need cycles?
+            lsq.opName = inst.opname
+            lsq.Vj = int(inst.source1)
+            for register in architectureRegisterFile.intRegisterList:    # TODO: source is int and destination is fp
+                if register.name == inst.source2:
+                    if register.busy:
+                        h = reorderBuffer.findLastEntry(register)
+                        if h is not None and h.ready:
+                            lsq.Vk = h.value
+                        else:
+                            lsq.Qk = h.name
                     else:
-                        lsq.Qk = h.name
-                else:
-                    lsq.Vk = register.value
-                break
+                        lsq.Vk = register.value
+                    break
+            b = reorderBuffer.createRobEntry(inst)
+            for register in architectureRegisterFile.intRegisterList:  # TODO: optimize
+                if register.name == inst.destination:
+                    if not register.busy:
+                        register.robId = b
+                        register.busy = True
+                        break
+            for register in architectureRegisterFile.fpRegisterList:
+                if register.name == inst.destination:
+                    if not register.busy:
+                        register.robId = b
+                        register.busy = True
+                        break
 
-    if reorderBuffer.isFull() is False and pc != -1 and functionalUnit.isAvailable(instructionBuffer.head().opname):
+            lsq.destination = b
+            lsq.busy = True
+            lsq.opName = inst.opname
+            lsq.cyclesRemained = 4
+
+    if reorderBuffer.isFull() is False and pc != -1 and functionalUnit.isAvailable(instructionBuffer.head().opname):  # TODO: LD also goes into this part
         inst = instructionBuffer.pop()
         # fu = functionalUnit.findAvailable(inst.opname)   # if inst is a non ld/Sd instruction
-        rs, fu_cycle = functionalUnit.findAvailable(inst.opname)
+        rs, fu_cycle = functionalUnit.findAvailableRS(inst.opname)
         find = False
         for register in architectureRegisterFile.intRegisterList:  # TODO: also need to check fp registers
             if register.name == inst.source1:
@@ -71,8 +90,8 @@ def issue(reorderBuffer, instructionBuffer, pc, functionalUnit, architectureRegi
                             # fu.reservationStation.Qj = h.name
                             rs.Qj = h.name
                     else:
-                        # fu.reservationStation.Vj = register.value     # TODO: check
-                        rs.Vj = register.value  # TODO: check
+                        # fu.reservationStation.Vj = register.value
+                        rs.Vj = register.value
                     find = True
                     break
         if not find:
@@ -115,9 +134,9 @@ def issue(reorderBuffer, instructionBuffer, pc, functionalUnit, architectureRegi
         if not find:
             rs.Vk = int(inst.source2)
 
-        b = reorderBuffer.createRobEntry(inst)
-
-        if inst.destination != 'BGE':
+        b = reorderBuffer.createRobEntry(inst)      # TODO: LD and SD also go into ROB(unless it can solve immediately?)
+                                                    # TODO: Also check the condition for creating ROB entry
+        if inst.destination != 'Bne' and inst.destination != 'Beq':
             for register in architectureRegisterFile.intRegisterList:   # TODO: optimize
                 if register.name == inst.destination:
                     if not register.busy:
@@ -139,14 +158,20 @@ def issue(reorderBuffer, instructionBuffer, pc, functionalUnit, architectureRegi
     return reorderBuffer, instructionBuffer, functionalUnit, architectureRegisterFile
 
 
-def execute(functionalUnit):
+def execute(functionalUnit, memory):
     for fu in functionalUnit.fuList:
         for rs in fu.reservationStation:
             if rs.busy and rs.Vj is not None:
                 if rs.opName == 'LD':     # TODO: need a rs for load and store?
                     rs.cyclesRemained -= 1
                 elif rs.Vk is not None:
-                    rs.cyclesRemained -= 1
+                    rs.cyclesRemained -= 1 # TODO: Ld and Sd
+        for lsq in fu.loadstorequeue:
+            if lsq.busy and lsq.Vj is not None and lsq.Vk is not None:
+                lsq.address = lsq.Vj + lsq.Vk
+                if lsq.opName == 'Ld':
+                    lsq.value = memory.getValue(lsq.address)
+
     return functionalUnit
 
 
@@ -158,8 +183,8 @@ def writeBack(commonDataBus, functionalUnit, reorderBuffer, architectureRegister
             if rs.cyclesRemained is not None and rs.busy is True:
                 if rs.cyclesRemained <= 0 and not commonDataBus.busy:
                     rs.busy = False
-                    if rs.opName != 'BGE':
-                        result = rs.execute
+                    if rs.opName != 'Bne' or rs.opName != 'Beq':
+                        result = rs.execute()
                         b = rs.destination
                         commonDataBus.busy = True
                         commonDataBus.value = result
@@ -180,7 +205,7 @@ def writeBack(commonDataBus, functionalUnit, reorderBuffer, architectureRegister
                                     rs2.Qk = None
                         rs.busy = False
                         rs.clear()
-                    elif rs.opName == 'BGE':
+                    elif rs.opName == 'Bne' or rs.opName == 'Beq':
                         if not rs.Vj >= rs.Vk:
                             listtoremove = reorderBuffer.flush(rs.destination)
                             functionalUnit.flush(listtoremove)
@@ -192,16 +217,19 @@ def writeBack(commonDataBus, functionalUnit, reorderBuffer, architectureRegister
                             if e.name == rs.destination:
                                 e.ready = True
                         rs.clear()
+        # loadStoreQueue = fu.loadstorequeue
+        # for lsq in loadStoreQueue:     # TODO: write back the value to ROB
+
     return commonDataBus, functionalUnit, reorderBuffer, architectureRegisterFile, instructionBuffer
 
 
-def commit(finished, pc, reorderBuffer, architectureRegisterFile):
+def commit(finished, pc, reorderBuffer, architectureRegisterFile, cycle):
     head = reorderBuffer.getHead()
-    if head.opname == '':
+    if head.opname == '' and cycle > 1:
         finished = True
         return finished, pc, reorderBuffer, architectureRegisterFile
     if head.ready:
-        if head.opname == 'BGE':
+        if head.opname == 'Bne' or head.opname == 'Beq':
             if pc == -1:
                 finished = True     # TODO: stop sign should be redesigned
             reorderBuffer.pop()

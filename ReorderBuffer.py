@@ -69,7 +69,7 @@ class ReorderBuffer(object):
     def findLastEntry(self, register):
         index = self.tail
         for i in range(self.numelements):  # ROB.numelements? public?
-            if self.list[index].destination == register.name:  # Register or register?
+            if self.list[index].destination == register.name:
                 return self.list[index]
             index -= 1
             index %= self.size

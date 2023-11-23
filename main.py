@@ -43,19 +43,20 @@ program = readProgramFile(program)
 IB = InstructionBuffer(instruction_window_size)
 RF = RegisterFile(number_of_registers)
 ROB = ReorderBuffer(len(FU.fuList))
-cycles = 0
+cycles = 1
 rf = open("Report.txt", "w")
 rf.close()
 
-while not finished:
+while (not finished) and (PC != -1):
     CDB, FU, ROB, RF, IB = writeBack(CDB, FU, ROB, RF, IB)
-    finished, PC, ROB, RF = commit(finished, PC, ROB, RF)
-    IB, PC = fetch(IB, PC, program, LSQ)
+    finished, PC, ROB, RF = commit(finished, PC, ROB, RF, cycles)
+    IB, PC = fetch(IB, PC, program)
     if not IB.isEmpty():
         ROB, IB, FU, RF = issue(ROB, IB, PC, FU, RF)    # delete output PC
-    FU = execute(FU)
+    FU = execute(FU, MM)
     print_report()
     cycles += 1
+
 
 if finished:
     print('R2:', RF.intRegisterList[2].value)
